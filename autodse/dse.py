@@ -12,6 +12,18 @@ import numpy as np
 
 API_URL = "https://dse.davidchen.page/api/"
 
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, float):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        return super(NpEncoder, self).default(obj)
+
 
 def proxy_fn(kwargs):
     results = target_fn(**kwargs)
@@ -152,7 +164,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
     # Send the results to the server
     response = requests.post(
         API_URL + "experiment/result",
-        json=json.dumps({"data": results, "id": experiment["id"]}),
+        json=json.dumps({"data": results, "id": experiment["id"]}, cls=NpEncoder),
         params={"api_key": api_key},
     )
 
