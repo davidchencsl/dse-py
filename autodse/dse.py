@@ -8,6 +8,8 @@ import multiprocessing as mp
 import socket
 import traceback
 
+import numpy as np
+
 API_URL = "https://dse.davidchen.page/api/"
 
 
@@ -98,7 +100,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
         results_list = []
         with mp.Pool(NUM_CORES) as p:
             iter_start_time = time.time()
-            for i, partial_result in enumerate(p.imap_unordered(proxy_fn, args), 1):
+            for i, partial_result in enumerate(p.imap(proxy_fn, args), 1):
                 if partial_result:
                     results_list.append(partial_result)
                 if i % REPORT_INTERVAL == 0:
