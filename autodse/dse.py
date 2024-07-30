@@ -96,6 +96,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
 
     print(f"Experiment started. Running with NUM_CORES={NUM_CORES}")
     REPORT_INTERVAL = 100
+    times = np.zeros(5)
     try:
         results_list = []
         with mp.Pool(NUM_CORES) as p:
@@ -108,6 +109,11 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
                     iter_end_time = time.time()
                     iter_total_time = iter_end_time - iter_start_time
                     iter_start_time = iter_end_time
+
+                    times = np.roll(times, 1)
+                    times[0] = iter_total_time
+                    # weighted average
+                    iter_total_time = np.mean(times)
                     response = requests.post(
                         API_URL + "experiment/progress",
                         json=json.dumps(
