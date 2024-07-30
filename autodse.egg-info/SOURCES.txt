@@ -1,0 +1,8 @@
+README
+setup.py
+autodse/__init__.py
+autodse/dse.py
+autodse.egg-info/PKG-INFO
+autodse.egg-info/SOURCES.txt
+autodse.egg-info/dependency_links.txt
+autodse.egg-info/top_level.txt

@@ -130,7 +130,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
         )
         return
     # print(results_list)
-    results = {k: {} for k in results_list[0].keys()}
+    results = {"inputs": {}, "outputs": {}}
     for result in results_list:
         # inputs or outputs
         for kind in result:
