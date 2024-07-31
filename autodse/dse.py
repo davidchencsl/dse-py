@@ -108,7 +108,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
 
     print(f"Experiment started. Running with NUM_CORES={NUM_CORES}")
     REPORT_INTERVAL = 100
-    times = np.zeros(5)
+    times = np.zeros(20)
     try:
         results_list = []
         with mp.Pool(NUM_CORES) as p:
@@ -137,7 +137,8 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
                                     "interval": REPORT_INTERVAL,
                                 },
                                 "id": experiment["id"],
-                            }
+                            },
+                            cls=NpEncoder,
                         ),
                         params={"api_key": api_key},
                     )
