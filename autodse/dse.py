@@ -117,7 +117,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
                 if partial_result:
                     results_list.append(partial_result)
                 if i % REPORT_INTERVAL == 0:
-                    # print(f"Progress: {i}/{len(args)}")
+                    print(f"Progress: {i}/{len(args)}                                      \r")
                     iter_end_time = time.time()
                     iter_total_time = iter_end_time - iter_start_time
                     iter_start_time = iter_end_time
@@ -142,14 +142,16 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
                         ),
                         params={"api_key": api_key},
                     )
-
-    except Exception:
+    except Exception as e:
+        print(e)
         response = requests.post(
             API_URL + "experiment/error",
             json=json.dumps({"error": traceback.format_exc(), "id": experiment["id"]}),
             params={"api_key": api_key},
         )
         return
+    
+    print("")
     # print(results_list)
     results = {"inputs": {}, "outputs": {}}
     for result in results_list:
@@ -161,6 +163,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
                     results[kind][k] = []
                 results[kind][k].append(result[kind][k])
 
+    print("Sending results to the server.")
     # print(results)
     # Send the results to the server
     response = requests.post(
