@@ -117,7 +117,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
                 if partial_result:
                     results_list.append(partial_result)
                 if i % REPORT_INTERVAL == 0:
-                    print(f"Progress: {i}/{len(args)}                                      \r")
+                    print(f"Progress: {i}/{len(args)}                                      \r", end="")
                     iter_end_time = time.time()
                     iter_total_time = iter_end_time - iter_start_time
                     iter_start_time = iter_end_time
