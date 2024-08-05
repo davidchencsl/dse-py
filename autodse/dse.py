@@ -163,6 +163,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
                     results[kind][k] = []
                 results[kind][k].append(result[kind][k])
 
+    json.dump(results, open("results.json", "w"), cls=NpEncoder)
     print("Sending results to the server.")
     # print(results)
     # Send the results to the server
@@ -171,6 +172,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
         json=json.dumps({"data": results, "id": experiment["id"]}, cls=NpEncoder),
         params={"api_key": api_key},
     )
+    print(response.json())
 
 
 def test(a=1, b=[1, 2], c=("hello", 10), d="a", e=0.5):
