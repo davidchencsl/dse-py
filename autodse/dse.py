@@ -5,7 +5,7 @@ import json
 import time
 import ast
 import itertools
-import multiprocessing as mp
+import multiprocess as mp
 import socket
 import traceback
 
@@ -26,15 +26,8 @@ class NpEncoder(json.JSONEncoder):
         return super(NpEncoder, self).default(obj)
 
 
-def proxy_fn(kwargs):
-    results = target_fn(**kwargs)
-    return {"inputs": kwargs, "outputs": results} if results else None
-
-
 def start(fn, api_key, output_path="results.json", NUM_CORES=mp.cpu_count()):
     # analyze the function fn and send the results to the server
-    global target_fn
-    target_fn = fn
     signature = inspect.signature(fn)
     function_info = {
         "fn_name": fn.__name__,
@@ -110,6 +103,9 @@ def start(fn, api_key, output_path="results.json", NUM_CORES=mp.cpu_count()):
     print(f"Experiment started. Running with NUM_CORES={NUM_CORES}")
     REPORT_INTERVAL = 10
     times = np.zeros(20)
+    def proxy_fn(kwargs):
+        results = fn(**kwargs)
+        return {"inputs": kwargs, "outputs": results} if results else None
     try:
         results_list = []
         with mp.Pool(NUM_CORES) as p:
