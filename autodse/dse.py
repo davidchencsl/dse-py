@@ -168,9 +168,9 @@ def start(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
         json.dump(results, zf, cls=NpEncoder)
 
     results_str = base64.b64encode(open(output_path, "rb").read()).decode("utf-8")
-    if  len(results_str.encode('utf-8')) >= 1024 * 1024 * 1024:
-        print(f"Output file {output_path} is too large. Not uploading to server.")
-        return
+    # if  len(results_str.encode('utf-8')) >= 1024 * 1024 * 1024:
+    #     print(f"Output file {output_path} is too large. Not uploading to server.")
+    #     return
     
     print("Sending results to the server.")
     
