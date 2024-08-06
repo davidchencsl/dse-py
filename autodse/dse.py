@@ -1,4 +1,5 @@
 import inspect
+import os
 import requests
 import json
 import time
@@ -166,6 +167,9 @@ def start(fn, api_key, output_path="results.json", NUM_CORES=mp.cpu_count()):
                 results[kind][k].append(result[kind][k])
 
     json.dump(results, open(output_path, "w"), cls=NpEncoder)
+    if os.path.getsize(output_path) > 255 * 1024 * 1024:
+        print(f"Output file {output_path} is too large. Not uploading to server.")
+        return
     print("Sending results to the server.")
     # print(results)
     # Send the results to the server
