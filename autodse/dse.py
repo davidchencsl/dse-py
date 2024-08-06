@@ -107,21 +107,22 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
     # Call the function with the generated arguments
 
     print(f"Experiment started. Running with NUM_CORES={NUM_CORES}")
-    REPORT_INTERVAL = 100
+    REPORT_INTERVAL = 10
     times = np.zeros(20)
     try:
         results_list = []
         with mp.Pool(NUM_CORES) as p:
             iter_start_time = time.time()
+            start_iter = 0
             for i, partial_result in enumerate(p.imap(proxy_fn, args), 1):
                 if partial_result:
                     results_list.append(partial_result)
-                if i % REPORT_INTERVAL == 0:
                     print(f"Progress: {i}/{len(args)}                                      \r", end="")
-                    iter_end_time = time.time()
-                    iter_total_time = iter_end_time - iter_start_time
+                iter_end_time = time.time()
+                iter_total_time = iter_end_time - iter_start_time
+                
+                if iter_total_time > REPORT_INTERVAL:
                     iter_start_time = iter_end_time
-
                     times = np.roll(times, 1)
                     times[0] = iter_total_time
                     # weighted average
@@ -134,7 +135,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
                                     "index": i,
                                     "total": len(args),
                                     "time_per_interval": iter_total_time,
-                                    "interval": REPORT_INTERVAL,
+                                    "interval": i - start_iter,
                                 },
                                 "id": experiment["id"],
                             },
@@ -142,6 +143,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
                         ),
                         params={"api_key": api_key},
                     )
+                    start_iter = i
     except Exception as e:
         print(e)
         response = requests.post(
