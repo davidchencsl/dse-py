@@ -9,6 +9,7 @@ import multiprocess as mp
 import socket
 import traceback
 import gzip
+import base64
 
 import numpy as np
 
@@ -165,15 +166,18 @@ def start(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
                 results[kind][k].append(result[kind][k])
     with gzip.open(output_path, 'wt', encoding='UTF-8') as zf:
         json.dump(results, zf, cls=NpEncoder)
-    if get_uncompressed_size(output_path) > 255 * 1024 * 1024:
+
+    if get_uncompressed_size(output_path) > 1024 * 1024 * 1024:
         print(f"Output file {output_path} is too large. Not uploading to server.")
         return
+    
     print("Sending results to the server.")
+    results_str = base64.b64encode(open(output_path, "rb").read()).decode("utf-8")
     # print(results)
     # Send the results to the server
     response = requests.post(
         API_URL + "experiment/result",
-        json=json.dumps({"data": results, "id": experiment["id"]}, cls=NpEncoder),
+        json=json.dumps({"data": results_str, "id": experiment["id"]}, cls=NpEncoder),
         params={"api_key": api_key},
     )
     print(response.json())
