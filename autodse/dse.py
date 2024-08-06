@@ -30,7 +30,7 @@ def proxy_fn(kwargs):
     return {"inputs": kwargs, "outputs": results} if results else None
 
 
-def start(fn, api_key, NUM_CORES=mp.cpu_count()):
+def start(fn, api_key, output_path="results.json", NUM_CORES=mp.cpu_count()):
     # analyze the function fn and send the results to the server
     global target_fn
     target_fn = fn
@@ -165,7 +165,7 @@ def start(fn, api_key, NUM_CORES=mp.cpu_count()):
                     results[kind][k] = []
                 results[kind][k].append(result[kind][k])
 
-    json.dump(results, open("results.json", "w"), cls=NpEncoder)
+    json.dump(results, open(output_path, "w"), cls=NpEncoder)
     print("Sending results to the server.")
     # print(results)
     # Send the results to the server
