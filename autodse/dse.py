@@ -8,6 +8,7 @@ import itertools
 import multiprocess as mp
 import socket
 import traceback
+import gzip
 
 import numpy as np
 
@@ -26,8 +27,9 @@ class NpEncoder(json.JSONEncoder):
         return super(NpEncoder, self).default(obj)
 
 
-def start(fn, api_key, output_path="results.json", NUM_CORES=mp.cpu_count()):
+def start(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
     # analyze the function fn and send the results to the server
+    output_path += ".json.gz"
     signature = inspect.signature(fn)
     function_info = {
         "fn_name": fn.__name__,
@@ -161,9 +163,9 @@ def start(fn, api_key, output_path="results.json", NUM_CORES=mp.cpu_count()):
                 if k not in results[kind]:
                     results[kind][k] = []
                 results[kind][k].append(result[kind][k])
-
-    json.dump(results, open(output_path, "w"), cls=NpEncoder)
-    if os.path.getsize(output_path) > 255 * 1024 * 1024:
+    with gzip.open(output_path, 'wt', encoding='UTF-8') as zf:
+        json.dump(results, zf, cls=NpEncoder)
+    if get_uncompressed_size(output_path) > 255 * 1024 * 1024:
         print(f"Output file {output_path} is too large. Not uploading to server.")
         return
     print("Sending results to the server.")
@@ -175,6 +177,12 @@ def start(fn, api_key, output_path="results.json", NUM_CORES=mp.cpu_count()):
         params={"api_key": api_key},
     )
     print(response.json())
+
+def get_uncompressed_size(file_path):
+    import subprocess
+    output = subprocess.run(["gzip", "-l", file_path], capture_output=True)
+    output = output.stdout.decode("utf-8").split("\n")[1].split()
+    return int(output[1])
 
 
 def test(a=1, b=[1, 2], c=("hello", 10), d="a", e=0.5):
