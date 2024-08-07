@@ -10,6 +10,7 @@ import traceback
 import gzip
 import base64
 
+from tqdm import tqdm
 import numpy as np
 import multiprocess as mp
 
@@ -181,6 +182,116 @@ def start(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
         params={"api_key": api_key},
     )
     print(response.json())
+
+
+def start_local(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
+    # analyze the function fn and send the results to the server
+    output_path += ".json.gz"
+    signature = inspect.signature(fn)
+    function_info = {
+        "fn_name": fn.__name__,
+        "parameters": [
+            {
+                "name": p.name,
+                "type": (
+                    type(p.default).__name__
+                    if p.default is not inspect.Parameter.empty
+                    else "None"
+                ),
+                "default": repr(p.default),
+            }
+            for p in signature.parameters.values()
+        ],
+    }
+    function_info["full_signature"] = (
+        function_info["fn_name"]
+        + "("
+        + ", ".join(
+            [
+                f"{p['name']}: {p['type']} = {p['default']}"
+                for p in function_info["parameters"]
+            ]
+        )
+        + ")"
+    )
+    # print(function_info)
+    # print(api_key)
+
+    function_info = json.dumps(function_info)
+
+    # send the function_info to the server
+    response = requests.post(
+        API_URL + "experiment/create",
+        json=function_info,
+        params={"api_key": api_key, "hostname": socket.gethostname()},
+    )
+    response_json = response.json()
+    # print(response_json)
+
+    # Wait for server to start the experiment
+    print("Waiting for server to start the experiment")
+    status = "CREATED"
+    while status == "CREATED":
+        response = requests.get(
+            API_URL + "experiment",
+            params={"api_key": api_key, "id": response_json["data"][0]["id"]},
+        )
+        response_json = response.json()
+        status = response_json["data"][0]["status"]
+        time.sleep(5)
+        # print(f"Experiment status: {status}")
+
+    # print(f"Experiment status: {status}")
+    experiment = response_json["data"][0]
+
+    explorations = json.loads(experiment["explorations"])
+    # print(explorations)
+    converted_explorations = {}
+    for arg in explorations:
+        values = f"[{explorations[arg]}]"
+        converted_explorations[arg] = ast.literal_eval(values)
+    # print(converted_explorations)
+
+    args = [
+        dict(zip(converted_explorations.keys(), values))
+        for values in itertools.product(*converted_explorations.values())
+    ]
+    # print(args)
+    # Call the function with the generated arguments
+
+    print(f"Experiment started. Running with NUM_CORES={NUM_CORES}")
+    def proxy_fn(kwargs):
+        results = fn(**kwargs)
+        return {"inputs": kwargs, "outputs": results} if results else None
+    try:
+        results_list = []
+        with mp.Pool(NUM_CORES) as p:
+            for partial_result in tqdm(p.imap(proxy_fn, args)):
+                if partial_result:
+                    results_list.append(partial_result)
+    except Exception as e:
+        print(e)
+        response = requests.post(
+            API_URL + "experiment/error",
+            json=json.dumps({"error": traceback.format_exc(), "id": experiment["id"]}),
+            params={"api_key": api_key},
+        )
+        return
+    
+    print("")
+    # print(results_list)
+    results = {"inputs": {}, "outputs": {}}
+    for result in results_list:
+        # inputs or outputs
+        for kind in result:
+            # each key in inputs or outputs
+            for k in result[kind]:
+                if k not in results[kind]:
+                    results[kind][k] = []
+                results[kind][k].append(result[kind][k])
+    with gzip.open(output_path, 'wt', encoding='UTF-8') as zf:
+        json.dump(results, zf, cls=NpEncoder)
+    print(f"Results saved to {output_path}. Uncompressed size: {get_uncompressed_size(output_path)} bytes")
 
 def get_uncompressed_size(file_path):
     import subprocess
