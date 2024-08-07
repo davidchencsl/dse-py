@@ -5,13 +5,13 @@ import json
 import time
 import ast
 import itertools
-import multiprocess as mp
 import socket
 import traceback
 import gzip
 import base64
 
 import numpy as np
+import multiprocess as mp
 
 API_URL = "https://dse.davidchen.page/api/"
 
@@ -167,13 +167,12 @@ def start(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
     with gzip.open(output_path, 'wt', encoding='UTF-8') as zf:
         json.dump(results, zf, cls=NpEncoder)
 
-    results_str = base64.b64encode(open(output_path, "rb").read()).decode("utf-8")
-    # if  len(results_str.encode('utf-8')) >= 1024 * 1024 * 1024:
-    #     print(f"Output file {output_path} is too large. Not uploading to server.")
-    #     return
+    if  get_uncompressed_size(output_path) > 1024 * 1024 * 1024:
+        print(f"Output file {output_path} is too large. Not uploading to server.")
+        return
     
     print("Sending results to the server.")
-    
+    results_str = base64.b64encode(open(output_path, "rb").read()).decode("utf-8")
     # print(results)
     # Send the results to the server
     response = requests.post(
@@ -182,6 +181,12 @@ def start(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
         params={"api_key": api_key},
     )
     print(response.json())
+
+def get_uncompressed_size(file_path):
+    import subprocess
+    output = subprocess.run(["gzip", "-l", file_path], capture_output=True)
+    output = output.stdout.decode("utf-8").split("\n")[1].split()
+    return int(output[1])
 
 
 def test(a=1, b=[1, 2], c=("hello", 10), d="a", e=0.5):
