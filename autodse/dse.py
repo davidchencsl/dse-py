@@ -9,6 +9,7 @@ import socket
 import traceback
 import gzip
 import base64
+import traceback
 
 from tqdm import tqdm
 import numpy as np
@@ -21,6 +22,8 @@ class NpEncoder(json.JSONEncoder):
         if isinstance(obj, np.integer):
             return int(obj)
         if isinstance(obj, float):
+            return float(obj)
+        if isinstance(obj, Float):
             return float(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
@@ -93,8 +96,9 @@ def start(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
     # print(explorations)
     converted_explorations = {}
     for arg in explorations:
-        values = f"[{explorations[arg]}]"
-        converted_explorations[arg] = ast.literal_eval(values)
+        if explorations[arg]:
+            values = f"[{explorations[arg]}]"
+            converted_explorations[arg] = ast.literal_eval(values)
     # print(converted_explorations)
 
     args = [
@@ -166,7 +170,7 @@ def start(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
                     results[kind][k] = []
                 results[kind][k].append(result[kind][k])
     with gzip.open(output_path, 'wt', encoding='UTF-8') as zf:
-        json.dump(results, zf, cls=NpEncoder)
+        json.dump(results, zf, cls=NpEncoder, default=str)
 
     if  get_uncompressed_size(output_path) > 1024 * 1024 * 1024:
         print(f"Output file {output_path} is too large. Not uploading to server.")
@@ -248,8 +252,9 @@ def start_local(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
     # print(explorations)
     converted_explorations = {}
     for arg in explorations:
-        values = f"[{explorations[arg]}]"
-        converted_explorations[arg] = ast.literal_eval(values)
+        if explorations[arg]:
+            values = f"[{explorations[arg]}]"
+            converted_explorations[arg] = ast.literal_eval(values)
     # print(converted_explorations)
 
     args = [
@@ -266,7 +271,7 @@ def start_local(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
     try:
         results_list = []
         with mp.Pool(NUM_CORES) as p:
-            for partial_result in tqdm(p.imap(proxy_fn, args)):
+            for partial_result in tqdm(p.imap(proxy_fn, args), total=len(args)):
                 if partial_result:
                     results_list.append(partial_result)
     except Exception as e:
@@ -290,7 +295,167 @@ def start_local(fn, api_key, output_path="results", NUM_CORES=mp.cpu_count()):
                     results[kind][k] = []
                 results[kind][k].append(result[kind][k])
     with gzip.open(output_path, 'wt', encoding='UTF-8') as zf:
-        json.dump(results, zf, cls=NpEncoder)
+        json.dump(results, zf, cls=NpEncoder, default=str)
+    print(f"Results saved to {output_path}. Uncompressed size: {get_uncompressed_size(output_path)} bytes")
+
+
+def start_local_with_args(fn, args, output_path="results", NUM_CORES=mp.cpu_count()):
+    # analyze the function fn and send the results to the server
+    output_path += ".json.gz"
+    signature = inspect.signature(fn)
+    function_info = {
+        "fn_name": fn.__name__,
+        "parameters": [
+            {
+                "name": p.name,
+                "type": (
+                    type(p.default).__name__
+                    if p.default is not inspect.Parameter.empty
+                    else "None"
+                ),
+                "default": repr(p.default),
+            }
+            for p in signature.parameters.values()
+        ],
+    }
+    function_info["full_signature"] = (
+        function_info["fn_name"]
+        + "("
+        + ", ".join(
+            [
+                f"{p['name']}: {p['type']} = {p['default']}"
+                for p in function_info["parameters"]
+            ]
+        )
+        + ")"
+    )
+
+    function_info = json.dumps(function_info)
+
+
+    converted_explorations = args 
+
+    args = [
+        dict(zip(converted_explorations.keys(), values))
+        for values in itertools.product(*converted_explorations.values())
+    ]
+    # print(args)
+    # Call the function with the generated arguments
+
+    print(f"Experiment started. Running with NUM_CORES={NUM_CORES}")
+    def proxy_fn(kwargs):
+        results = fn(**kwargs)
+        return {"inputs": kwargs, "outputs": results} if results else None
+    try:
+        results_list = []
+        with mp.Pool(NUM_CORES) as p:
+            for partial_result in tqdm(p.imap(proxy_fn, args), total=len(args), position=1):
+                if partial_result:
+                    results_list.append(partial_result)
+    except Exception as e:
+        print(e)
+        traceback.print_exc()
+        return
+    
+    print("")
+    # print(results_list)
+    results = {"inputs": {}, "outputs": {}}
+    for result in results_list:
+        # inputs or outputs
+        for kind in result:
+            # each key in inputs or outputs
+            for k in result[kind]:
+                if k not in results[kind]:
+                    results[kind][k] = []
+                results[kind][k].append(result[kind][k])
+    with gzip.open(output_path, 'wt', encoding='UTF-8') as zf:
+        json.dump(results, zf, cls=NpEncoder, default=str)
+    print(f"Results saved to {output_path}. Uncompressed size: {get_uncompressed_size(output_path)} bytes")
+
+def start_local_with_zip_args(fn, prod_args, zip_args, output_path="results", NUM_CORES=mp.cpu_count()):
+    # analyze the function fn and send the results to the server
+    output_path += ".json.gz"
+    signature = inspect.signature(fn)
+    function_info = {
+        "fn_name": fn.__name__,
+        "parameters": [
+            {
+                "name": p.name,
+                "type": (
+                    type(p.default).__name__
+                    if p.default is not inspect.Parameter.empty
+                    else "None"
+                ),
+                "default": repr(p.default),
+            }
+            for p in signature.parameters.values()
+        ],
+    }
+    function_info["full_signature"] = (
+        function_info["fn_name"]
+        + "("
+        + ", ".join(
+            [
+                f"{p['name']}: {p['type']} = {p['default']}"
+                for p in function_info["parameters"]
+            ]
+        )
+        + ")"
+    )
+
+    function_info = json.dumps(function_info)
+
+    for key, value in prod_args.items():
+        if not isinstance(value, list):
+            prod_args[key] = [value]
+
+    prod_args = [
+        dict(zip(prod_args.keys(), values))
+        for values in itertools.product(*prod_args.values())
+    ]
+
+    zip_args = [
+        dict(zip(zip_args.keys(), values))
+        for values in zip(*zip_args.values())
+    ]
+
+    args = [
+        {**prod_arg, **zip_arg}
+        for prod_arg in prod_args
+        for zip_arg in zip_args
+    ]
+
+    # print(args)
+    # Call the function with the generated arguments
+
+    print(f"Experiment started. Running with NUM_CORES={NUM_CORES}")
+    def proxy_fn(kwargs):
+        results = fn(**kwargs)
+        return {"inputs": kwargs, "outputs": results} if results else None
+    try:
+        results_list = []
+        with mp.Pool(NUM_CORES) as p:
+            for partial_result in tqdm(p.imap(proxy_fn, args), total=len(args), position=1):
+                if partial_result:
+                    results_list.append(partial_result)
+    except Exception as e:
+        print(e)
+        traceback.print_exc()
+        return
+    
+    print("")
+    # print(results_list)
+    results = {"inputs": {}, "outputs": {}}
+    for result in results_list:
+        # inputs or outputs
+        for kind in result:
+            # each key in inputs or outputs
+            for k in result[kind]:
+                if k not in results[kind]:
+                    results[kind][k] = []
+                results[kind][k].append(result[kind][k])
+    with gzip.open(output_path, 'wt', encoding='UTF-8') as zf:
+        json.dump(results, zf, cls=NpEncoder, default=str)
     print(f"Results saved to {output_path}. Uncompressed size: {get_uncompressed_size(output_path)} bytes")
 
 def get_uncompressed_size(file_path):
