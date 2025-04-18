@@ -294,6 +294,6 @@ def get_uncompressed_size(file_path):
     output = output.stdout.decode("utf-8").split("\n")[1].split()
     return int(output[1])
 
-
-def test(a=1, b=[1, 2], c=("hello", 10), d="a", e=0.5):
-    return {"output": a + sum(b) + c[1] + ord(d) * e}
+def dse_tqdm(*args, **kwargs):
+    idx = mp.current_process()._identity[0]-1
+    return tqdm(*args, **kwargs, position=idx+1, desc=f"Process {idx}", leave=False)
