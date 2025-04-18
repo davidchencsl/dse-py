@@ -295,5 +295,5 @@ def get_uncompressed_size(file_path):
     return int(output[1])
 
 def dse_tqdm(*args, **kwargs):
-    idx = mp.current_process()._identity[0]-1
+    idx = mp.current_process()._identity[0]-1 if mp.current_process()._identity else 0
     return tqdm(*args, **kwargs, position=idx+1, desc=f"Process {idx}", leave=False)
